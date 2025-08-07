@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fingernet"
+version = "1.0.0"
+authors = [
+  { name="João Felipe Contreras", email="jfcm.pipe@gmail.com" },
+]
+description = "Ferramenta para extrair características de impressões digitais usando a rede FingerNet."
+readme = "README.md"
+license = { file="LICENSE" }
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Image Recognition",
+]
+# Dependências extraídas dos seus arquivos .py
+dependencies = [
+    "torch",
+    "numpy",
+    "Pillow",
+    "scipy",
+    "opencv-python",
+    "matplotlib",
+    "tqdm",
+    "h5py",
+]
+
+[project.urls]
+Homepage = "https://github.com/JF235/FingerNet"
+
+[project.scripts]
+fingernet = "fingernet.cli:main"
+
+[tool.setuptools.packages.find]
+# Procura automaticamente por pacotes (como 'fingernet') no diretório raiz.
+where = ["."]

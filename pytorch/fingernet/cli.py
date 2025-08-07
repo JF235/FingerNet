@@ -4,11 +4,13 @@ import os
 import glob
 
 # Importa apenas as funções de alto nível necessárias
-from fingernet import get_fingernet, run_inference
+from . import get_fingernet, run_inference
 
-def _get_image_files(input_path: str) -> list[str]:
+
+def _get_image_files(input_path: str, recursive: bool = False) -> list[str]:
     """
     Obtém uma lista de caminhos de imagem a partir de um arquivo ou diretório.
+    Se recursive=True, busca recursivamente.
     """
     if not os.path.exists(input_path):
         raise FileNotFoundError(f"Caminho de entrada não encontrado: {input_path}")
@@ -18,7 +20,10 @@ def _get_image_files(input_path: str) -> list[str]:
         supported_exts = ('*.bmp', '*.png', '*.jpg', '*.jpeg', '*.tif')
         image_files = []
         for ext in supported_exts:
-            image_files.extend(glob.glob(os.path.join(input_path, ext)))
+            if recursive:
+                image_files.extend(glob.glob(os.path.join(input_path, '**', ext), recursive=True))
+            else:
+                image_files.extend(glob.glob(os.path.join(input_path, ext)))
         if not image_files:
             raise FileNotFoundError(f"Nenhum arquivo de imagem suportado encontrado em: {input_path}")
         return image_files
@@ -46,17 +51,29 @@ def main():
             default='fingernet_output', 
             help='Diretório de saída principal. (Padrão: fingernet_output)'
         )
+        cmd_parser.add_argument(
+            '-r', '--recursive',
+            action='store_true',
+            help='Busca recursiva por imagens em subdiretórios.'
+        )
+        cmd_parser.add_argument(
+            '-b', '--batch-size',
+            type=int,
+            default=1,
+            help='Tamanho do lote para processamento em batch. (Padrão: 1)'
+        )
     
+
     args = parser.parse_args()
 
     try:
         # 1. Obter a lista de arquivos de imagem
-        image_files = _get_image_files(args.input)
-        
+        image_files = _get_image_files(args.input, recursive=getattr(args, 'recursive', False))
+
         # 2. Carregar o modelo FingerNet
         print("Carregando modelo FingerNet...")
         fnet = get_fingernet(log=False)
-        
+
         # 3. Executar a inferência, delegando o salvamento para a função
         # O comando da CLI ('full', 'mnt', etc.) é passado diretamente para o parâmetro 'save_mode'
         run_inference(
@@ -64,7 +81,7 @@ def main():
             image_paths=image_files,
             output_dir=args.output,
             save_mode=args.command,
-            batch_size=8
+            batch_size=args.batch_size
         )
 
     except (FileNotFoundError, ValueError) as e:

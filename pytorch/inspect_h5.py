@@ -1,3 +1,13 @@
+"""
+inspect_h5.py
+
+Este script inspeciona e imprime a estrutura de um arquivo HDF5 (.hdf5, .h5, .model), mostrando grupos e datasets presentes no arquivo.
+
+Exemplo de uso no contexto do projeto:
+    python inspect_h5.py ../models/released_version/Model.model
+
+Isso exibirá a hierarquia de grupos e datasets contidos no arquivo Model.model.
+"""
 # inspect_h5.py
 import h5py
 import argparse

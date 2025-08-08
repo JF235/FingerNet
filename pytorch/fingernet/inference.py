@@ -9,7 +9,7 @@ from tqdm import tqdm
 # Supondo que seu projeto tenha uma estrutura onde 'fingernet' é um pacote.
 from .interface import get_fingernet
 
-def run_inference(input_path: str, output_path: str, weights_path: str, recursive: bool, batch_size: int, num_gpus: int | None):
+def run_inference(input_path: str, output_path: str, weights_path: str, recursive: bool, batch_size: int, device: str, num_gpus: int | None, num_cores: int | None):
     """
     Executa a inferência em imagens usando o FingerNetWrapper com suporte a lotes
     e salva os resultados processados.
@@ -20,13 +20,26 @@ def run_inference(input_path: str, output_path: str, weights_path: str, recursiv
         weights_path (str): Caminho para o arquivo de pesos do modelo (.pth).
         recursive (bool): Se True, busca por imagens recursivamente.
         batch_size (int): O tamanho do lote para processamento.
+        device (str): O dispositivo a ser utilizado (ex: "cpu" ou "cuda").
+        num_gpus (int | None): O número de GPUs a serem utilizadas (ou None para usar todas).
+        num_cores (int | None): O número de CPUs a serem utilizadas (ou None para usar todas).
     """
     # 1. Preparação do Modelo e Dispositivo
     print("--- Inicializando FingerNet ---")
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    if device is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
     
+    if device == "cpu":
+        # Set torch number of cores
+        if num_cores is not None:
+            torch.set_num_threads(num_cores)
+
+    device = torch.device(device)
+
+
     try:
-        model = get_fingernet(weights_path=weights_path, log=True, num_gpus=num_gpus)
+        model = get_fingernet(weights_path, device, log=True, num_gpus=num_gpus)
     except FileNotFoundError as e:
         print(f"Erro: {e}")
         return

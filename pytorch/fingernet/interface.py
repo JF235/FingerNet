@@ -182,7 +182,7 @@ class FingerNetWrapper(nn.Module):
                 
         return minutiae[keep]
 
-def get_fingernet(weights_path: str, log: bool = True, num_gpus: int = 1) -> FingerNetWrapper:
+def get_fingernet(weights_path: str, device: str, log: bool = True, num_gpus: int = 1) -> FingerNetWrapper:
     """
     Factory para criar e carregar uma instância do FingerNetWrapper pronta para uso.
 
@@ -200,7 +200,6 @@ def get_fingernet(weights_path: str, log: bool = True, num_gpus: int = 1) -> Fin
         raise FileNotFoundError(f"Arquivo de pesos não encontrado em: {weights_path}")
 
     # 1. Detectar dispositivo
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if log: print(f"[FingerNet] Dispositivo selecionado: {device}")
 
     # 2. Instanciar o modelo base

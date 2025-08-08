@@ -17,5 +17,7 @@ if __name__ == '__main__':
         weights_path=args.weights_path,
         recursive=args.recursive,
         batch_size=args.batch_size,
+        device='cuda',
         num_gpus=None, # Try to use all
+        num_cores=None
     )

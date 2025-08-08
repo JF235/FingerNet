@@ -65,7 +65,7 @@ def run_inference(input_path: str, output_path: str, weights_path: str, recursiv
     print(f"Encontradas {len(image_paths)} imagens, divididas em {len(batches)} lotes de tamanho até {batch_size}.")
 
     # 4. Loop de Inferência por Lote
-    for batch_idx, batch_paths in tqdm(enumerate(batches), total=len(batches), desc="Processando lotes"):
+    for batch_idx, batch_paths in tqdm(enumerate(batches), total=len(batches), desc="Processando lotes", unit="batch"):
         #print(f"\n--- Processando Lote {batch_idx + 1}/{len(batches)} ---")
         
         # a. Carregar e pré-processar as imagens do lote

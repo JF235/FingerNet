@@ -1,10 +1,11 @@
+# fingernet/interface.py
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import kornia
 import os
 
-# Importação da classe FingerNet para anotação de tipo.
 from .model import FingerNet
 
 class FingerNetWrapper(nn.Module):
@@ -182,7 +183,7 @@ class FingerNetWrapper(nn.Module):
                 
         return minutiae[keep]
 
-def get_fingernet(weights_path: str, device: str, log: bool = True, num_gpus: int = 1) -> FingerNetWrapper:
+def get_fingernet(weights_path: str, device: str, log: bool = True) -> FingerNetWrapper:
     """
     Factory para criar e carregar uma instância do FingerNetWrapper pronta para uso.
 
@@ -207,27 +208,18 @@ def get_fingernet(weights_path: str, device: str, log: bool = True, num_gpus: in
     fingernet_model = FingerNet()
 
     # 3. Carregar os pesos (state_dict)
-    # map_location=device garante que o modelo carregue corretamente
-    # independentemente de onde foi salvo (CPU ou GPU).
     if log: print(f"[FingerNet] Carregando pesos de: {weights_path}")
     fingernet_model.load_state_dict(torch.load(weights_path, map_location=device))
 
     # 4. Colocar o modelo em modo de avaliação (IMPORTANTE!)
-    # Isso desativa camadas como Dropout e usa as médias/variâncias
-    # de BatchNorm em vez das estatísticas do lote atual.
     fingernet_model.eval()
     if log: print("[FingerNet] Modelo em modo de avaliação (.eval()).")
 
-    # Verifica se a CUDA está disponível e se há mais de uma GPU
-    if device.type == 'cuda' and torch.cuda.device_count() > 1:
-        num_gpus = torch.cuda.device_count() if num_gpus is None else num_gpus
-        if log: print(f"[FingerNet] Utilizando {num_gpus} GPUs via nn.DataParallel.")
-        # Envolve o modelo com DataParallel
-        fingernet_model = nn.DataParallel(fingernet_model, device_ids=list(range(num_gpus)))
+    # ----- REMOVIDO -----
+    # A lógica do nn.DataParallel foi removida. O Pytorch Lightning cuidará disso.
+    # --------------------
 
     # 5. Criar e mover o wrapper para o dispositivo
-    # O wrapper, sendo um nn.Module, moverá o fingernet_model interno
-    # para o mesmo dispositivo automaticamente.
     if log: print("[FingerNet] Criando e movendo o wrapper para o dispositivo...")
     fnet_wrapper = FingerNetWrapper(model=fingernet_model).to(device)
 

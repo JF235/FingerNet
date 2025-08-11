@@ -19,23 +19,24 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Image Recognition",
 ]
 # Dependências extraídas dos seus arquivos .py
-dependencies = [
-    "torch",
-    "numpy",
-    "Pillow",
-    "scipy",
-    "opencv-python",
-    "matplotlib",
-    "tqdm",
-    "h5py",
-]
+# dependencies = [
+#     "torch",
+#     "numpy",
+#     "Pillow",
+#     "scipy",
+#     "opencv-python",
+#     "matplotlib",
+#     "tqdm",
+#     "h5py",
+# ]
 
 [project.urls]
 Homepage = "https://github.com/JF235/FingerNet"
+
 
 [project.scripts]
 fingernet = "fingernet.cli:main"
 
 [tool.setuptools.packages.find]
-# Procura automaticamente por pacotes (como 'fingernet') no diretório raiz.
+# Procura automaticamente por pacotes (como 'fingernet') no diretório raiz do projeto.
 where = ["."]

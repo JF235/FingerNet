@@ -144,3 +144,74 @@ def plot_output(
     
     # Fecha a figura para liberar memória
     plt.close(fig)
+
+def plot_from_result_folder(result_folder: str, save_path: str | None = None, stride: int = 16):
+    """
+    Plota os resultados da inferência a partir de uma pasta de saída (CLI),
+    usando apenas os arquivos salvos: enhanced.png, orientation_field.npy, minutiae.txt.
+
+    Args:
+        result_folder (str): Caminho para a pasta de resultados de uma imagem.
+        save_path (str | None): Caminho para salvar a figura. Se None, exibe na tela.
+        stride (int): Stride para visualização do campo de orientação.
+    """
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from PIL import Image
+    import os
+
+    # Caminhos dos arquivos esperados
+    enhanced_path = os.path.join(result_folder, 'enhanced.png')
+    orientation_path = os.path.join(result_folder, 'orientation_field.npy')
+    minutiae_path = os.path.join(result_folder, 'minutiae.txt')
+
+    # Carregar arquivos
+    if not os.path.exists(enhanced_path):
+        print(f"Arquivo não encontrado: {enhanced_path}")
+        return
+    if not os.path.exists(orientation_path):
+        print(f"Arquivo não encontrado: {orientation_path}")
+        return
+    if not os.path.exists(minutiae_path):
+        print(f"Arquivo não encontrado: {minutiae_path}")
+        return
+
+    enhanced_image = np.array(Image.open(enhanced_path).convert('L'))
+    orientation_field = np.load(orientation_path)
+    # Minúcias: x, y, angle, score
+    minutiae = np.loadtxt(minutiae_path, delimiter=',', skiprows=1)
+    if minutiae.ndim == 1:
+        minutiae = np.expand_dims(minutiae, 0)
+
+    # Cria figura com 3 subplots
+    fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+
+    # 1. Imagem melhorada
+    ax0 = axes[0]
+    plot_enhanced(ax0, enhanced_image)
+    ax0.set_title("Imagem Melhorada")
+
+    # 2. Imagem melhorada + campo de orientação
+    ax1 = axes[1]
+    plot_enhanced(ax1, enhanced_image)
+    plot_ori_field(ax1, orientation_field, stride=stride)
+    ax1.set_title(f"Campo de Orientação (Stride: {stride})")
+
+    # 3. Imagem melhorada + minúcias
+    ax2 = axes[2]
+    plot_enhanced(ax2, enhanced_image)
+    plot_mnt(ax2, minutiae)
+    ax2.set_title(f"Minúcias Detectadas ({len(minutiae)})")
+
+    # Título geral
+    base_name = os.path.basename(os.path.normpath(result_folder))
+    fig.suptitle(f"Resultados FingerNet (CLI): {base_name}", fontsize=16)
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+
+    if save_path:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        plt.savefig(save_path)
+        print(f"📈 Visualização salva em: {save_path}")
+    else:
+        plt.show()
+    plt.close(fig)

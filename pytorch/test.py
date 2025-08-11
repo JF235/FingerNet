@@ -4,12 +4,15 @@ import argparse
 import os
 import numpy as np
 from PIL import Image
+import torch
 import pytorch_lightning as pl
 from tqdm import tqdm
 
 # Importa os novos módulos do Lightning
 from fingernet.lightning_datamodule import FingerprintDataModule
 from fingernet.lightning_model import FingerNetLightning
+
+torch.set_float32_matmul_precision('medium')
 
 def save_results(result_item: dict, output_path: str):
     """Salva os resultados de uma única imagem."""
@@ -36,7 +39,7 @@ def save_results(result_item: dict, output_path: str):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Script de inferência distribuída para a FingerNet com PyTorch Lightning.")
-    parser.add_argument('--input-path', type=str, required=True, help="Caminho para uma imagem ou diretório.")
+    parser.add_argument('--input', type=str, required=True, help="Caminho para uma imagem, diretório ou uma lista com nome de arquivos.")
     parser.add_argument('--output-path', type=str, required=True, help="Diretório onde os resultados serão salvos.")
     parser.add_argument('--weights-path', type=str, required=True, help="Caminho para os pesos .pth do modelo.")
     parser.add_argument('-b', '--batch-size', type=int, default=1, help="Tamanho do lote para inferência.")
@@ -47,7 +50,7 @@ if __name__ == '__main__':
 
     # 1. Instanciar o DataModule
     data_module = FingerprintDataModule(
-        input_path=args.input_path,
+        input=args.input,
         batch_size=args.batch_size,
         recursive=args.recursive,
         num_workers=args.num_cores

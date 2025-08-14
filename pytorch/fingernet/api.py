@@ -34,6 +34,26 @@ def save_results(result_item: dict, output_path: str):
     Image.fromarray(ori_norm_visual).save(os.path.join(result_dir, 'orientation_visual.png'))
     np.save(os.path.join(result_dir, 'orientation_field.npy'), ori_cpu)
 
+class ResultsSaveCallback(pl.Callback):
+    def __init__(self, output_path: str):
+        super().__init__()
+        self.output_path = output_path
+
+    def on_predict_batch_end(
+        self,
+        trainer: pl.Trainer,
+        pl_module: pl.LightningModule,
+        outputs: list, # 'outputs' é o que você retornou do predict_step
+        batch: any,
+        batch_idx: int,
+        dataloader_idx: int = 0,
+    ):
+        # Este método é chamado em cada processo da GPU ao final de um lote.
+        # 'outputs' aqui é a lista de dicionários para o lote atual.
+        if outputs:
+            for result_item in outputs:
+                save_results(result_item, self.output_path)
+
 def run_lightning_inference(
     input_path: str,
     output_path: str,
@@ -41,7 +61,7 @@ def run_lightning_inference(
     batch_size: int = 1,
     recursive: bool = False,
     num_cores: int = 4,
-    use_all_gpus: bool = True
+    devices: int | list[int] | str = "auto",
 ):
     """
     Executa a inferência distribuída com PyTorch Lightning de forma programática.
@@ -55,8 +75,6 @@ def run_lightning_inference(
         num_cores (int): Número de núcleos de CPU para carregar dados (por GPU).
         use_all_gpus (bool): Se True, usa todas as GPUs disponíveis. Se False, usa uma única GPU ou CPU.
     """
-    print("--- Configurando o ambiente de inferência com PyTorch Lightning ---")
-
     # 1. Instanciar o DataModule
     data_module = FingerprintDataModule(
         input=input_path,
@@ -68,35 +86,34 @@ def run_lightning_inference(
     # 2. Instanciar o Modelo Lightning
     model_module = FingerNetLightning(weights_path=weights_path)
 
+    results_saver = ResultsSaveCallback(output_path=output_path)
+
     # 3. Configurar e instanciar o Trainer
     # O Trainer gerencia a lógica de distribuição (DDP) automaticamente.
     # Não é necessário usar `torchrun`.
+    strategy = "auto"
+    if torch.cuda.device_count() > 1:
+        try:
+            # Esta é uma forma comum de detectar um ambiente de notebook
+            get_ipython().__class__.__name__
+            strategy = "ddp_notebook"
+        except NameError:
+            # Se não estiver em um notebook, use a estratégia para scripts
+            strategy = "ddp_find_unused_parameters_false"
+
     trainer = pl.Trainer(
-        accelerator="auto",          # "auto" seleciona gpu, tpu, etc.
-        devices=-1 if use_all_gpus else 1, # -1 usa todas as GPUs, 1 usa uma GPU (ou CPU se não houver GPU)
-        strategy="ddp_find_unused_parameters_false" if use_all_gpus and torch.cuda.device_count() > 1 else "auto", # DDP para multi-GPU
-        logger=False,                # Desativa logs para inferência limpa
+        accelerator="auto",
+        devices=devices,
+        strategy=strategy,
+        logger=False,
         enable_checkpointing=False,
         enable_progress_bar=True,
         enable_model_summary=False,
+        callbacks=[results_saver] 
     )
 
     # 4. Executar a inferência
-    print("\n--- Iniciando a inferência ---")
-    predictions_per_batch = trainer.predict(model=model_module, datamodule=data_module)
-    print("\n--- Inferência concluída. Salvando resultados... ---")
-
-    # 5. Salvar os resultados
-    # O trainer.predict coleta os resultados de todos os processos no processo principal.
-    if trainer.is_global_zero:
-        # A estrutura é uma lista de listas, então precisamos achatá-la.
-        all_results = [item for batch in predictions_per_batch for item in batch]
-
-        for result_item in tqdm(all_results, desc="Salvando arquivos", unit="imagem"):
-            save_results(result_item, output_path)
-
-        print("\n--- Processo concluído com sucesso. ---")
-    
+    trainer.predict(model=model_module, datamodule=data_module)    
 
 def run_inference(input_path: str, output_path: str, weights_path: str, recursive: bool, batch_size: int, device: str, num_gpus: int | None, num_cores: int | None):
     """

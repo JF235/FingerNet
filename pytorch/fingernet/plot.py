@@ -203,7 +203,6 @@ def plot_from_result_folder(result_folder: str, save_path: str | None = None, st
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
 
     if save_path:
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
         plt.savefig(save_path)
         print(f"📈 Visualização salva em: {save_path}")
     else:

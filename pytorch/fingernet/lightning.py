@@ -5,6 +5,7 @@ from PIL import Image
 import os
 from torch.utils.data import Dataset, DataLoader
 import glob
+import warnings
 
 from .model import get_fingernet
 
@@ -14,6 +15,13 @@ class FingerNetLightning(pl.LightningModule):
     """
     def __init__(self, weights_path: str):
         super().__init__()
+
+        warnings.filterwarnings(
+            "ignore", 
+            message="No device id is",
+            category=UserWarning
+        )
+
         self.weights_path = weights_path
         # O modelo será inicializado no método setup para garantir que ele seja
         # movido para o dispositivo correto em cada processo DDP.
@@ -104,7 +112,7 @@ class FingerprintDataModule(pl.LightningDataModule):
     def setup(self, stage: str | None = None):
         """Encontra todos os caminhos de imagem. Chamado em cada processo (GPU). Também calcula as dimensões mínima e máxima."""
         if not self.image_paths:
-            print(f"--- Buscando imagens em: {self.input} ---")
+            # print(f"--- Buscando imagens em: {self.input} ---")
             if os.path.isfile(self.input):
                 # Verifica se é um arquivo de texto (lista de caminhos)
                 _, ext = os.path.splitext(self.input)
@@ -121,10 +129,10 @@ class FingerprintDataModule(pl.LightningDataModule):
                 for ext in extensoes:
                     pattern = f"{self.input}/**/*.{ext.lower()}" if self.recursive else f"{self.input}/*.{ext.lower()}"
                     self.image_paths.extend(glob.glob(pattern, recursive=self.recursive))
-            if not self.image_paths:
-                print("Nenhuma imagem encontrada.")
-            else:
-                print(f"Encontradas {len(self.image_paths)} imagens.")
+            # if not self.image_paths:
+            #     print("Nenhuma imagem encontrada.")
+            # else:
+            #     print(f"Encontradas {len(self.image_paths)} imagens.")
 
         # Calcula as dimensões mínima e máxima
         min_h, min_w = float('inf'), float('inf')
@@ -142,7 +150,7 @@ class FingerprintDataModule(pl.LightningDataModule):
             max_w = max(max_w, w)
         self.min_shape = (min_h, min_w)
         self.max_shape = (max_h, max_w)
-        print(f"Menor dimensão encontrada: {self.min_shape}, Maior dimensão encontrada: {self.max_shape}")
+        # print(f"Menor dimensão encontrada: {self.min_shape}, Maior dimensão encontrada: {self.max_shape}")
 
         # Alimenta o dataset com a maior dimensão
         self.dataset = FingerprintDataset(self.image_paths, target_size=self.max_shape)

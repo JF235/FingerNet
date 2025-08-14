@@ -1,5 +1,3 @@
-import matplotlib
-#matplotlib.use('Agg') # Usa um backend não-interativo para evitar erros em servidores sem GUI
 import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
@@ -81,7 +79,8 @@ def plot_mnt(ax: plt.Axes, minutiae: np.ndarray, r: int = 10):
 def plot_output(
     result: dict,
     save_path: str | None = None,
-    stride: int = 16
+    stride: int = 16,
+    figsize: tuple = (20, 6)
 ):
     """
     Gera uma figura 2x2 com a visualização completa dos resultados da inferência.
@@ -100,12 +99,12 @@ def plot_output(
         return
 
     # Extrai os dados do dicionário de resultados
-    orientation_field = result['orientation_field']
-    enhanced_image = result['enhanced_image']
-    minutiae = result['minutiae']
+    orientation_field = result['orientation_field'].squeeze()
+    enhanced_image = result['enhanced_image'].squeeze()
+    minutiae = result['minutiae'][0]
 
     # Cria a figura e a grade de subplots 1x4
-    fig, axes = plt.subplots(1, 4, figsize=(20, 6))
+    fig, axes = plt.subplots(1, 4, figsize=figsize)
     
     # --- Subplot 1 (Primeira Coluna) ---
     ax1 = axes[0]
@@ -155,11 +154,6 @@ def plot_from_result_folder(result_folder: str, save_path: str | None = None, st
         save_path (str | None): Caminho para salvar a figura. Se None, exibe na tela.
         stride (int): Stride para visualização do campo de orientação.
     """
-    import numpy as np
-    import matplotlib.pyplot as plt
-    from PIL import Image
-    import os
-
     # Caminhos dos arquivos esperados
     enhanced_path = os.path.join(result_folder, 'enhanced.png')
     orientation_path = os.path.join(result_folder, 'orientation_field.npy')
@@ -209,7 +203,6 @@ def plot_from_result_folder(result_folder: str, save_path: str | None = None, st
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
 
     if save_path:
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
         plt.savefig(save_path)
         print(f"📈 Visualização salva em: {save_path}")
     else:

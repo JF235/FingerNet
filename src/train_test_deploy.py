@@ -45,7 +45,7 @@ test_set = ['../datasets/NISTSD27/',]
 deploy_set = ['../datasets/NISTSD27/images/','../datasets/CISL24218/', \
             '../datasets/FVC2002DB2A/','../datasets/NIST4/','../datasets/NIST14/']
 pretrain = '../models/released_version/Model.model'
-output_dir = '../output/'+datetime.now().strftime('%Y%m%d-%H%M%S')
+output_dir = '../datasets/output/'+datetime.now().strftime('%Y%m%d-%H%M%S')
 logging = init_log(output_dir)
 copy_file(sys.path[0]+'/'+sys.argv[0], output_dir+'/')
 

@@ -1,7 +1,7 @@
 import torch
 import h5py
 
-from .model import FingerNet
+from .fingernet.model import FingerNet
 
 # =====================
 # Constantes e Mapeamentos

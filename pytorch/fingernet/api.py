@@ -9,6 +9,11 @@ import glob
 from .model import get_fingernet
 from .lightning import FingerNetLightning, FingerprintDataModule
 
+DEFAULT_WEIGHTS_PATH = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "models", "released_version", "Model.pth")
+)
+
+
 # Defina a precisão do matmul para otimização
 torch.set_float32_matmul_precision('medium')
 
@@ -57,7 +62,7 @@ class ResultsSaveCallback(pl.Callback):
 def run_lightning_inference(
     input_path: str,
     output_path: str,
-    weights_path: str,
+    weights_path: str = DEFAULT_WEIGHTS_PATH,
     batch_size: int = 1,
     recursive: bool = False,
     num_cores: int = 4,

@@ -129,8 +129,8 @@ class FingerprintDataModule(pl.LightningDataModule):
                 for ext in extensoes:
                     pattern = f"{self.input}/**/*.{ext.lower()}" if self.recursive else f"{self.input}/*.{ext.lower()}"
                     self.image_paths.extend(glob.glob(pattern, recursive=self.recursive))
-            # if not self.image_paths:
-            #     print("Nenhuma imagem encontrada.")
+            if not self.image_paths:
+                print("Warning: Nenhuma imagem encontrada.")
             # else:
             #     print(f"Encontradas {len(self.image_paths)} imagens.")
 
@@ -153,6 +153,7 @@ class FingerprintDataModule(pl.LightningDataModule):
         # print(f"Menor dimensão encontrada: {self.min_shape}, Maior dimensão encontrada: {self.max_shape}")
 
         # Alimenta o dataset com a maior dimensão
+        print("len(self.image_paths) =", len(self.image_paths))
         self.dataset = FingerprintDataset(self.image_paths, target_size=self.max_shape)
 
     def predict_dataloader(self):

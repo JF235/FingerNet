@@ -10,54 +10,88 @@ from .model import get_fingernet
 from .lightning import FingerNetLightning, FingerprintDataModule
 
 DEFAULT_WEIGHTS_PATH = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "models", "released_version", "Model.pth")
+    os.path.join(os.path.dirname(__file__), "../../models/released_version/Model.pth")
 )
-
 
 # Defina a precisão do matmul para otimização
 torch.set_float32_matmul_precision('medium')
 
 def save_results(result_item: dict, output_path: str):
-    """Salva os resultados"""
-    base_name = os.path.splitext(os.path.basename(result_item['input_path']))[0]
-    result_dir = os.path.join(output_path, base_name)
-    os.makedirs(result_dir, exist_ok=True)
+    """
+    Salva os resultados da inferência na nova estrutura de diretórios.
+    Ex: output/mask/101_1.png, output/enhanced/101_1.png, etc.
+    """
+    # Pega o nome do arquivo original, incluindo a extensão (ex: '101_1.png')
+    original_filename = os.path.basename(result_item['input_path'])
+    # Pega o nome do arquivo sem a extensão para os arquivos .txt e .npy (ex: '101_1')
+    base_name = os.path.splitext(original_filename)[0]
 
-    # Salvar minúcias
-    minutiae_path = os.path.join(result_dir, 'minutiae.txt')
-    np.savetxt(minutiae_path, result_item['minutiae'], fmt=['%.0f', '%.0f','%.6f','%.6f'], header='x, y, angle, score', delimiter=',')
+    # --- Salva cada componente em seu respectivo subdiretório ---
 
-    # Salvar imagem melhorada
-    Image.fromarray(result_item['enhanced_image']).save(os.path.join(result_dir, 'enhanced.png'))
+    # Salvar minúcias (.txt)
+    minutiae_path = os.path.join(output_path, 'minutiae', f"{base_name}.txt")
+    np.savetxt(minutiae_path, result_item['minutiae'], fmt=['%.0f', '%.0f', '%.6f', '%.6f'], header='x, y, angle, score', delimiter=',')
 
-    # Salvar máscara
-    Image.fromarray(result_item['segmentation_mask']).save(os.path.join(result_dir, 'mask.png'))
+    # Salvar imagem melhorada (.png)
+    enhanced_path = os.path.join(output_path, 'enhanced', original_filename)
+    Image.fromarray(result_item['enhanced_image']).save(enhanced_path)
+
+    # Salvar máscara (.png)
+    mask_path = os.path.join(output_path, 'mask', original_filename)
+    Image.fromarray(result_item['segmentation_mask']).save(mask_path)
 
     # Salvar campo de orientação (visual e bruto)
     ori_cpu = result_item['orientation_field']
+    
+    # Visual (.png)
+    ori_visual_path = os.path.join(output_path, 'ori_visual', original_filename)
     ori_norm_visual = ((ori_cpu - ori_cpu.min()) / (ori_cpu.max() - ori_cpu.min() + 1e-8) * 255).astype(np.uint8)
-    Image.fromarray(ori_norm_visual).save(os.path.join(result_dir, 'orientation_visual.png'))
-    np.save(os.path.join(result_dir, 'orientation_field.npy'), ori_cpu)
+    Image.fromarray(ori_norm_visual).save(ori_visual_path)
+    
+    # Bruto (.npy)
+    ori_field_path = os.path.join(output_path, 'ori_field', f"{base_name}.npy")
+    np.save(ori_field_path, ori_cpu)
+
 
 class ResultsSaveCallback(pl.Callback):
+    """
+    Callback do PyTorch Lightning que gerencia o salvamento dos resultados.
+    """
     def __init__(self, output_path: str):
         super().__init__()
         self.output_path = output_path
 
+    def on_predict_start(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule"):
+        """
+        Hook chamado uma vez no início da predição para criar os diretórios de saída.
+        """
+        # Apenas o processo principal (rank 0) deve criar os diretórios para evitar conflitos.
+        if trainer.is_global_zero:
+            print(f"INFO: Criando diretórios de saída em '{self.output_path}'")
+            # Cria todos os subdiretórios necessários
+            os.makedirs(os.path.join(self.output_path, 'minutiae'), exist_ok=True)
+            os.makedirs(os.path.join(self.output_path, 'mask'), exist_ok=True)
+            os.makedirs(os.path.join(self.output_path, 'enhanced'), exist_ok=True)
+            os.makedirs(os.path.join(self.output_path, 'ori_visual'), exist_ok=True)
+            os.makedirs(os.path.join(self.output_path, 'ori_field'), exist_ok=True)
+
     def on_predict_batch_end(
         self,
-        trainer: pl.Trainer,
-        pl_module: pl.LightningModule,
-        outputs: list, # 'outputs' é o que você retornou do predict_step
+        trainer: "pl.Trainer",
+        pl_module: "pl.LightningModule",
+        outputs: list,
         batch: any,
         batch_idx: int,
         dataloader_idx: int = 0,
     ):
-        # Este método é chamado em cada processo da GPU ao final de um lote.
-        # 'outputs' aqui é a lista de dicionários para o lote atual.
+        """
+        Hook chamado ao final de cada lote de predição para salvar os resultados.
+        """
         if outputs:
             for result_item in outputs:
+                # Chama a nova função de salvamento
                 save_results(result_item, self.output_path)
+
 
 def run_lightning_inference(
     input_path: str,
@@ -66,7 +100,7 @@ def run_lightning_inference(
     batch_size: int = 1,
     recursive: bool = False,
     num_cores: int = 4,
-    devices: int | list[int] | str = "auto",
+    devices: int | list[int] | str = "auto"
 ):
     """
     Executa a inferência distribuída com PyTorch Lightning de forma programática.
@@ -90,20 +124,18 @@ def run_lightning_inference(
 
     # 2. Instanciar o Modelo Lightning
     model_module = FingerNetLightning(weights_path=weights_path)
-
+    
+    # Usa o novo Callback que implementa a lógica de criação de diretórios e salvamento
     results_saver = ResultsSaveCallback(output_path=output_path)
 
-    # 3. Configurar e instanciar o Trainer
-    # O Trainer gerencia a lógica de distribuição (DDP) automaticamente.
-    # Não é necessário usar `torchrun`.
     strategy = "auto"
-    if torch.cuda.device_count() > 1:
+    # Lógica para selecionar a estratégia DDP correta para notebooks
+    if (isinstance(devices, list) and len(devices) > 1) or (isinstance(devices, int) and devices == -1):
         try:
-            # Esta é uma forma comum de detectar um ambiente de notebook
             get_ipython().__class__.__name__
             strategy = "ddp_notebook"
+            if devices == -1: print("INFO: Ambiente de notebook com múltiplas GPUs detectado. Usando strategy='ddp_notebook'.")
         except NameError:
-            # Se não estiver em um notebook, use a estratégia para scripts
             strategy = "ddp_find_unused_parameters_false"
 
     trainer = pl.Trainer(
@@ -112,13 +144,10 @@ def run_lightning_inference(
         strategy=strategy,
         logger=False,
         enable_checkpointing=False,
-        enable_progress_bar=True,
-        enable_model_summary=False,
-        callbacks=[results_saver] 
+        callbacks=[results_saver] # Passa o callback para o Trainer
     )
 
-    # 4. Executar a inferência
-    trainer.predict(model=model_module, datamodule=data_module)    
+    trainer.predict(model=model_module, datamodule=data_module)
 
 def run_inference(input_path: str, output_path: str, weights_path: str, recursive: bool, batch_size: int, device: str, num_gpus: int | None, num_cores: int | None):
     """

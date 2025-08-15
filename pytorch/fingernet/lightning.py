@@ -7,7 +7,7 @@ from torch.utils.data import Dataset, DataLoader
 import glob
 import warnings
 
-from .model import get_fingernet
+from .model import get_fingernet, FingerNetWrapper
 
 class FingerNetLightning(pl.LightningModule):
     """
@@ -33,7 +33,7 @@ class FingerNetLightning(pl.LightningModule):
         """Inicializa o modelo. Chamado em cada processo (GPU)."""
         if self.model is None:
             # self.device é fornecido automaticamente pelo Lightning
-            self.model = get_fingernet(weights_path=self.weights_path, device=self.device, log=False)
+            self.model: FingerNetWrapper = get_fingernet(weights_path=self.weights_path, device=self.device, log=False)
 
     def predict_step(self, batch: tuple, batch_idx: int) -> list[dict]:
         """

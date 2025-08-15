@@ -46,14 +46,21 @@ def plot_command(args):
     Plota os resultados de uma imagem específica, lendo da nova estrutura de diretórios.
     """
     output_file = args.output_file
+    output_path = args.output_path
+
+    # Se output_path não foi fornecido ou está vazio, usa o diretório atual
+    if not output_path:
+        output_path = "."
+
     if output_file is None:
         # Salva a imagem de resumo com um nome descritivo na pasta de saída principal
         base_name = Path(args.image_filename).stem
-        output_file = Path(args.output_path) / f"{base_name}_visual_summary.png"
+        output_file = Path(output_path) / f"{base_name}_visual_summary.png"
+    
     
     # Chama a função de plotagem com os novos argumentos
     plot_from_output_folder(
-        output_path=args.output_path,
+        output_path=output_path,
         image_filename=args.image_filename,
         save_path=str(output_file)
     )

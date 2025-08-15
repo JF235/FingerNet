@@ -167,7 +167,7 @@ def plot_from_output_folder(
 
     # --- Reconstrói os caminhos dos arquivos com base na nova estrutura ---
     enhanced_path = os.path.join(output_path, 'enhanced', image_filename)
-    orientation_path = os.path.join(output_path, 'ori_field', f"{base_name}.npy")
+    orientation_path = os.path.join(output_path, 'ori', image_filename)
     minutiae_path = os.path.join(output_path, 'minutiae', f"{base_name}.txt")
 
     # Verifica se todos os arquivos necessários existem
@@ -178,7 +178,8 @@ def plot_from_output_folder(
 
     # Carrega os dados dos arquivos
     enhanced_image = np.array(Image.open(enhanced_path).convert('L'))
-    orientation_field = np.load(orientation_path)
+    orientation_img = np.array(Image.open(orientation_path))
+    orientation_field = np.deg2rad(orientation_img.astype(np.float32) - 90.0)
     minutiae = np.loadtxt(minutiae_path, delimiter=',', skiprows=1)
     if minutiae.ndim == 1 and minutiae.size > 0: # Garante que funcione para uma única minúcia
         minutiae = np.expand_dims(minutiae, 0)
@@ -208,7 +209,6 @@ def plot_from_output_folder(
 
     if save_path:
         # Garante que o diretório de destino para a imagem de plotagem exista
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
         plt.savefig(save_path)
         print(f"📈 Visualização salva em: {save_path}")
     else:

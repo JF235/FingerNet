@@ -40,17 +40,13 @@ def save_results(result_item: dict, output_path: str):
     mask_path = os.path.join(output_path, 'mask', original_filename)
     Image.fromarray(result_item['segmentation_mask']).save(mask_path)
 
-    # Salvar campo de orientação (visual e bruto)
+    # Salvar campo de orientação (codificado em PNG)
     ori_cpu = result_item['orientation_field']
-    
-    # Visual (.png)
-    ori_visual_path = os.path.join(output_path, 'ori_visual', original_filename)
-    ori_norm_visual = ((ori_cpu - ori_cpu.min()) / (ori_cpu.max() - ori_cpu.min() + 1e-8) * 255).astype(np.uint8)
-    Image.fromarray(ori_norm_visual).save(ori_visual_path)
-    
-    # Bruto (.npy)
-    ori_field_path = os.path.join(output_path, 'ori_field', f"{base_name}.npy")
-    np.save(ori_field_path, ori_cpu)
+
+    # Converte de radianos para graus, desloca em +90 e salva como uint8
+    orientation_path = os.path.join(output_path, 'ori', original_filename)
+    angles_deg_shifted = np.round(np.rad2deg(ori_cpu) + 90).astype(np.uint8)
+    Image.fromarray(angles_deg_shifted).save(orientation_path)
 
 
 class ResultsSaveCallback(pl.Callback):
@@ -72,8 +68,7 @@ class ResultsSaveCallback(pl.Callback):
             os.makedirs(os.path.join(self.output_path, 'minutiae'), exist_ok=True)
             os.makedirs(os.path.join(self.output_path, 'mask'), exist_ok=True)
             os.makedirs(os.path.join(self.output_path, 'enhanced'), exist_ok=True)
-            os.makedirs(os.path.join(self.output_path, 'ori_visual'), exist_ok=True)
-            os.makedirs(os.path.join(self.output_path, 'ori_field'), exist_ok=True)
+            os.makedirs(os.path.join(self.output_path, 'ori'), exist_ok=True)
 
     def on_predict_batch_end(
         self,

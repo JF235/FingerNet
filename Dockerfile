@@ -20,8 +20,9 @@ RUN pip install \
     matplotlib==2.2.5 \
     pydot==1.4.1 \
     graphviz==0.8.4 \
-    tensorflow==1.14.0 \
-    keras==2.0.2
+    tensorflow==1.0.1 \
+    keras==2.0.2 \
+    h5py==2.10.0
 
 WORKDIR /workspace/FingerNet
 

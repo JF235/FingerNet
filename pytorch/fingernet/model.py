@@ -1,3 +1,4 @@
+import time
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -6,6 +7,12 @@ from scipy import signal
 from PIL import Image
 import os
 import kornia
+
+DEFAULT_WEIGHTS_PATH = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "../..", "models", "released_version", "Model.pth")
+)
+
+DEFAULT_DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 class ImgNormalization(nn.Module):
     def __init__(self, m0=0.0, var0=1.0):
@@ -86,20 +93,26 @@ class EnhancementModule(nn.Module):
         self.gabor_real = nn.Conv2d(1, 90, 25, padding='same', bias=True)
         self.gabor_imag = nn.Conv2d(1, 90, 25, padding='same', bias=True)
 
+        # Pré-calcula o kernel gaussiano circular como tensor PyTorch
+        length = 180
+        stride = 2
+        std = 3
+        gaussian_pdf = signal.windows.gaussian(length + 1, std=std)
+        y = np.reshape(np.arange(stride / 2, length, stride), [1, 1, -1, 1])
+        label = np.reshape(np.arange(stride / 2, length, stride), [1, 1, 1, -1])
+        delta = np.array(np.abs(label - y), dtype=int)
+        delta = np.minimum(delta, length - delta) + length // 2
+        glabel = gaussian_pdf[delta].astype(np.float32)
+        # Salva como buffer para garantir que move junto com o módulo para o device
+        self.register_buffer('glabel_tensor', torch.from_numpy(glabel).permute(2, 3, 0, 1))
+
     def _ori_highest_peak(self, y_pred, length=180, stride=2):
         """
         Aplica uma convolução 2D entre a predição y_pred e um kernel gaussiano circular,
         para detectar o pico de orientação dominante em dados angulares (ex: impressões digitais).
         O kernel é construído considerando a periodicidade dos ângulos (0-180 graus).
         """
-        gaussian_pdf = signal.windows.gaussian(length + 1, std=3)
-        y = np.reshape(np.arange(stride / 2, length, stride), [1, 1, -1, 1])
-        label = np.reshape(np.arange(stride / 2, length, stride), [1, 1, 1, -1])
-        delta = np.array(np.abs(label - y), dtype=int)
-        delta = np.minimum(delta, length - delta) + length // 2
-        glabel = gaussian_pdf[delta].astype(np.float32)
-        glabel_tensor = torch.from_numpy(glabel).permute(2, 3, 0, 1).to(y_pred.device)
-        return F.conv2d(y_pred, glabel_tensor, padding='same')
+        return F.conv2d(y_pred, self.glabel_tensor, padding='same')
 
     def _select_max_orientation(self, ori_map):
         """
@@ -209,8 +222,10 @@ class FingerNetWrapper(nn.Module):
     def forward(self, x: torch.Tensor, minutiae_threshold: float = 0.5) -> dict[str, torch.Tensor]:
         
         padded_x = self.preprocess(x)
+        
         with torch.no_grad():
             raw_outputs = self.fingernet(padded_x)
+        
         final_outputs = self.postprocess(raw_outputs, threshold=minutiae_threshold)
 
         return final_outputs
@@ -354,7 +369,7 @@ def get_fingernet_core(weights_path: str, device: str, log: bool = True) -> Fing
 
     return fingernet_model
 
-def get_fingernet(weights_path: str, device: str, log: bool = True) -> FingerNetWrapper:
+def get_fingernet(weights_path: str = DEFAULT_WEIGHTS_PATH, device: str = DEFAULT_DEVICE, log: bool = True) -> FingerNetWrapper:
     """
     Gets the 
     1. preloaded, 

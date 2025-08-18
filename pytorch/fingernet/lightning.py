@@ -34,6 +34,7 @@ class FingerNetLightning(pl.LightningModule):
         if self.model is None:
             # self.device é fornecido automaticamente pelo Lightning
             self.model: FingerNetWrapper = get_fingernet(weights_path=self.weights_path, device=self.device, log=False)
+            self.model = torch.compile(self.model)
 
     def predict_step(self, batch: tuple, batch_idx: int) -> list[dict]:
         """
@@ -163,5 +164,7 @@ class FingerprintDataModule(pl.LightningDataModule):
             self.dataset,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
-            shuffle=False
+            shuffle=False,
+            pin_memory=True,
+            persistent_workers=True
         )

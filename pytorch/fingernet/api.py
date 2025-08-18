@@ -150,3 +150,6 @@ def run_lightning_inference(
 
     # 4. Executar a inferência
     trainer.predict(model=model_module, datamodule=data_module)
+
+
+    trainer.strategy.barrier()

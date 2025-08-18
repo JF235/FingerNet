@@ -120,8 +120,18 @@ GPU: Titan, Titan Black, Titan X, K20, K40, K80.
 
 ### Pytorch Implementation
 
-To compare
+To compare, use the Docker image available via the Dockerfile at the root of the repository.
+
+```bash
+# First, check if the image is already available
+docker image ls -a
+
+# Build if it does not exist
+docker build -t fingernet:legacy .
+``` 
 
 ```bash
 docker run -it --rm -v "$PWD":/workspace/FingerNet fingernet:legacy
+
+# If you need GPU support, add `--gpus all` before `-it`
 ```

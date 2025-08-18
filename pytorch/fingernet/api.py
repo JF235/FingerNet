@@ -3,6 +3,7 @@ import torch
 import pytorch_lightning as pl
 import numpy as np
 from PIL import Image
+from tqdm import tqdm
 
 from .model import DEFAULT_WEIGHTS_PATH
 from .lightning import FingerNetLightning, FingerprintDataModule
@@ -54,6 +55,7 @@ class ResultsSaveCallback(pl.Callback):
     def __init__(self, output_path: str):
         super().__init__()
         self.output_path = output_path
+        self.outputs = []
 
     def on_predict_start(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule"):
         """
@@ -81,9 +83,15 @@ class ResultsSaveCallback(pl.Callback):
         Hook chamado ao final de cada lote de predição para salvar os resultados.
         """
         if outputs:
-            for result_item in outputs:
-                # Chama a nova função de salvamento
-                save_results(result_item, self.output_path)
+            self.outputs.extend(outputs)
+
+    def on_predict_end(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule"):
+        """
+        Hook chamado uma vez no final de toda a predição para SALVAR os resultados.
+        """
+        print(f"INFO: Inferência concluída. Salvando {len(self.outputs)} resultados...")
+        for result_item in tqdm(self.outputs, desc="Salvando resultados"):
+            save_results(result_item, self.output_path)
 
 
 def run_lightning_inference(

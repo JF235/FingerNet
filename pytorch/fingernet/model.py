@@ -396,6 +396,9 @@ def get_fingernet(weights_path: str = DEFAULT_WEIGHTS_PATH, device: str = DEFAUL
     if log: print("[FingerNet] Criando e movendo o wrapper para o dispositivo...")
     fnet_wrapper = FingerNetWrapper(model=fingernet_model).to(device)
 
+    if device == "cpu":
+        fnet_wrapper.to(memory_format=torch.channels_last)
+
     if log: print("\n[FingerNet] Modelo pronto para inferência.")
     
     return fnet_wrapper

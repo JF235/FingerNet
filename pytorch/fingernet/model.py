@@ -247,7 +247,7 @@ class FingerNetWrapper(nn.Module):
 
         # 3. Processamento do campo de orientação
         ori_up = outputs['orientation upsample']
-        orientation_field = (torch.argmax(ori_up, dim=1).float() * 2.0 - 90) * torch.pi / 180.0
+        orientation_field = (torch.argmax(ori_up, dim=1).float() * 2.0 - 90.) * torch.pi / 180.0
         orientation_field = orientation_field * cleaned_mask_up
 
         # 4. Processamento da imagem melhorada

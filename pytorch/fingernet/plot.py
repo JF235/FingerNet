@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
 import os
+from pathlib import Path
 
 # =================================================================================
 # SEÇÃO 1: FUNÇÕES DE PLOTAGEM INDIVIDUAIS
@@ -144,67 +145,75 @@ def plot_output(
     # Fecha a figura para liberar memória
     plt.close(fig)
 
-def plot_from_result_folder(result_folder: str, save_path: str | None = None, stride: int = 16):
+
+def plot_from_output_folder(
+    output_path: str, 
+    image_filename: str, 
+    save_path: str | None = None, 
+    stride: int = 16
+):
     """
-    Plota os resultados da inferência a partir de uma pasta de saída (CLI),
-    usando apenas os arquivos salvos: enhanced.png, orientation_field.npy, minutiae.txt.
+    Plota os resultados da inferência a partir da nova estrutura de pastas,
+    reconstruindo os caminhos para uma imagem específica.
 
     Args:
-        result_folder (str): Caminho para a pasta de resultados de uma imagem.
+        output_path (str): Caminho para a pasta principal de resultados (ex: 'output/').
+        image_filename (str): Nome do arquivo da imagem original (ex: '101_1.png').
         save_path (str | None): Caminho para salvar a figura. Se None, exibe na tela.
         stride (int): Stride para visualização do campo de orientação.
     """
-    # Caminhos dos arquivos esperados
-    enhanced_path = os.path.join(result_folder, 'enhanced.png')
-    orientation_path = os.path.join(result_folder, 'orientation_field.npy')
-    minutiae_path = os.path.join(result_folder, 'minutiae.txt')
+    print(f"INFO: Gerando visualização para '{image_filename}' a partir de '{output_path}'...")
+    base_name = Path(image_filename).stem
 
-    # Carregar arquivos
-    if not os.path.exists(enhanced_path):
-        print(f"Arquivo não encontrado: {enhanced_path}")
-        return
-    if not os.path.exists(orientation_path):
-        print(f"Arquivo não encontrado: {orientation_path}")
-        return
-    if not os.path.exists(minutiae_path):
-        print(f"Arquivo não encontrado: {minutiae_path}")
-        return
+    # --- Reconstrói os caminhos dos arquivos com base na nova estrutura ---
+    enhanced_path = os.path.join(output_path, 'enhanced', image_filename)
+    orientation_path = os.path.join(output_path, 'ori', image_filename)
+    minutiae_path = os.path.join(output_path, 'minutiae', f"{base_name}.txt")
 
+    # Verifica se todos os arquivos necessários existem
+    for path in [enhanced_path, orientation_path, minutiae_path]:
+        if not os.path.exists(path):
+            print(f"ERRO: Arquivo necessário não encontrado: {path}")
+            return
+
+    # Carrega os dados dos arquivos
     enhanced_image = np.array(Image.open(enhanced_path).convert('L'))
-    orientation_field = np.load(orientation_path)
-    # Minúcias: x, y, angle, score
+    orientation_img = np.array(Image.open(orientation_path))
+    orientation_field = np.deg2rad(orientation_img.astype(np.float32) - 90.0)
     minutiae = np.loadtxt(minutiae_path, delimiter=',', skiprows=1)
-    if minutiae.ndim == 1:
+    if minutiae.ndim == 1 and minutiae.size > 0: # Garante que funcione para uma única minúcia
         minutiae = np.expand_dims(minutiae, 0)
+    elif minutiae.size == 0: # Lida com o caso de nenhuma minúcia encontrada
+        minutiae = np.empty((0, 4))
 
-    # Cria figura com 3 subplots
+
+    # --- Cria a figura com 3 subplots (lógica de plotagem inalterada) ---
     fig, axes = plt.subplots(1, 3, figsize=(18, 6))
 
     # 1. Imagem melhorada
-    ax0 = axes[0]
-    plot_enhanced(ax0, enhanced_image)
-    ax0.set_title("Imagem Melhorada")
+    plot_enhanced(axes[0], enhanced_image)
 
     # 2. Imagem melhorada + campo de orientação
-    ax1 = axes[1]
-    plot_enhanced(ax1, enhanced_image)
-    plot_ori_field(ax1, orientation_field, stride=stride)
-    ax1.set_title(f"Campo de Orientação (Stride: {stride})")
+    plot_enhanced(axes[1], enhanced_image)
+    plot_ori_field(axes[1], orientation_field, stride=stride)
+    axes[1].set_title(f"Campo de Orientação (Stride: {stride})")
 
     # 3. Imagem melhorada + minúcias
-    ax2 = axes[2]
-    plot_enhanced(ax2, enhanced_image)
-    plot_mnt(ax2, minutiae)
-    ax2.set_title(f"Minúcias Detectadas ({len(minutiae)})")
+    plot_enhanced(axes[2], enhanced_image)
+    plot_mnt(axes[2], minutiae)
+    axes[2].set_title(f"Minúcias Detectadas ({len(minutiae)})")
 
-    # Título geral
-    base_name = os.path.basename(os.path.normpath(result_folder))
-    fig.suptitle(f"Resultados FingerNet (CLI): {base_name}", fontsize=16)
+    # Título geral e salvamento
+    fig.suptitle(f"Resultados FingerNet para: {image_filename}", fontsize=16)
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
 
     if save_path:
+        # Garante que o diretório de destino para a imagem de plotagem exista
         plt.savefig(save_path)
         print(f"📈 Visualização salva em: {save_path}")
     else:
-        plt.show()
+        # plt.show() pode causar erros em ambientes sem GUI
+        print("AVISO: save_path não fornecido. A plotagem não será exibida em ambientes sem GUI.")
+        # plt.show() 
+    
     plt.close(fig)

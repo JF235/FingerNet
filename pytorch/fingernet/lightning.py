@@ -7,7 +7,7 @@ from torch.utils.data import Dataset, DataLoader
 import glob
 import warnings
 
-from .model import get_fingernet
+from .model import get_fingernet, FingerNetWrapper
 
 class FingerNetLightning(pl.LightningModule):
     """
@@ -33,7 +33,7 @@ class FingerNetLightning(pl.LightningModule):
         """Inicializa o modelo. Chamado em cada processo (GPU)."""
         if self.model is None:
             # self.device é fornecido automaticamente pelo Lightning
-            self.model = get_fingernet(weights_path=self.weights_path, device=self.device, log=False)
+            self.model: FingerNetWrapper = get_fingernet(weights_path=self.weights_path, device=self.device, log=False)
 
     def predict_step(self, batch: tuple, batch_idx: int) -> list[dict]:
         """
@@ -129,8 +129,8 @@ class FingerprintDataModule(pl.LightningDataModule):
                 for ext in extensoes:
                     pattern = f"{self.input}/**/*.{ext.lower()}" if self.recursive else f"{self.input}/*.{ext.lower()}"
                     self.image_paths.extend(glob.glob(pattern, recursive=self.recursive))
-            # if not self.image_paths:
-            #     print("Nenhuma imagem encontrada.")
+            if not self.image_paths:
+                print("Warning: Nenhuma imagem encontrada.")
             # else:
             #     print(f"Encontradas {len(self.image_paths)} imagens.")
 
@@ -153,6 +153,7 @@ class FingerprintDataModule(pl.LightningDataModule):
         # print(f"Menor dimensão encontrada: {self.min_shape}, Maior dimensão encontrada: {self.max_shape}")
 
         # Alimenta o dataset com a maior dimensão
+        print("len(self.image_paths) =", len(self.image_paths))
         self.dataset = FingerprintDataset(self.image_paths, target_size=self.max_shape)
 
     def predict_dataloader(self):

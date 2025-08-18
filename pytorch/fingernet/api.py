@@ -7,6 +7,10 @@ from PIL import Image
 from .model import DEFAULT_WEIGHTS_PATH
 from .lightning import FingerNetLightning, FingerprintDataModule
 
+DEFAULT_WEIGHTS_PATH = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "../../models/released_version/Model.pth")
+)
+
 # Defina a precisão do matmul para otimização
 torch.set_float32_matmul_precision('medium')
 
@@ -44,24 +48,43 @@ def save_results(result_item: dict, output_path: str):
 
 
 class ResultsSaveCallback(pl.Callback):
+    """
+    Callback do PyTorch Lightning que gerencia o salvamento dos resultados.
+    """
     def __init__(self, output_path: str):
         super().__init__()
         self.output_path = output_path
 
+    def on_predict_start(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule"):
+        """
+        Hook chamado uma vez no início da predição para criar os diretórios de saída.
+        """
+        # Apenas o processo principal (rank 0) deve criar os diretórios para evitar conflitos.
+        if trainer.is_global_zero:
+            print(f"INFO: Criando diretórios de saída em '{self.output_path}'")
+            # Cria todos os subdiretórios necessários
+            os.makedirs(os.path.join(self.output_path, 'minutiae'), exist_ok=True)
+            os.makedirs(os.path.join(self.output_path, 'mask'), exist_ok=True)
+            os.makedirs(os.path.join(self.output_path, 'enhanced'), exist_ok=True)
+            os.makedirs(os.path.join(self.output_path, 'ori'), exist_ok=True)
+
     def on_predict_batch_end(
         self,
-        trainer: pl.Trainer,
-        pl_module: pl.LightningModule,
-        outputs: list, # 'outputs' é o que você retornou do predict_step
+        trainer: "pl.Trainer",
+        pl_module: "pl.LightningModule",
+        outputs: list,
         batch: any,
         batch_idx: int,
         dataloader_idx: int = 0,
     ):
-        # Este método é chamado em cada processo da GPU ao final de um lote.
-        # 'outputs' aqui é a lista de dicionários para o lote atual.
+        """
+        Hook chamado ao final de cada lote de predição para salvar os resultados.
+        """
         if outputs:
             for result_item in outputs:
+                # Chama a nova função de salvamento
                 save_results(result_item, self.output_path)
+
 
 def run_lightning_inference(
     input_path: str,
@@ -70,7 +93,7 @@ def run_lightning_inference(
     batch_size: int = 1,
     recursive: bool = False,
     num_cores: int = 4,
-    devices: int | list[int] | str = "auto",
+    devices: int | list[int] | str = "auto"
 ):
     """
     Executa a inferência distribuída com PyTorch Lightning de forma programática.
@@ -94,20 +117,18 @@ def run_lightning_inference(
 
     # 2. Instanciar o Modelo Lightning
     model_module = FingerNetLightning(weights_path=weights_path)
-
+    
+    # Usa o novo Callback que implementa a lógica de criação de diretórios e salvamento
     results_saver = ResultsSaveCallback(output_path=output_path)
 
-    # 3. Configurar e instanciar o Trainer
-    # O Trainer gerencia a lógica de distribuição (DDP) automaticamente.
-    # Não é necessário usar `torchrun`.
     strategy = "auto"
-    if torch.cuda.device_count() > 1:
+    # Lógica para selecionar a estratégia DDP correta para notebooks
+    if (isinstance(devices, list) and len(devices) > 1) or (isinstance(devices, int) and devices == -1):
         try:
-            # Esta é uma forma comum de detectar um ambiente de notebook
             get_ipython().__class__.__name__
             strategy = "ddp_notebook"
+            if devices == -1: print("INFO: Ambiente de notebook com múltiplas GPUs detectado. Usando strategy='ddp_notebook'.")
         except NameError:
-            # Se não estiver em um notebook, use a estratégia para scripts
             strategy = "ddp_find_unused_parameters_false"
 
     trainer = pl.Trainer(
@@ -116,9 +137,7 @@ def run_lightning_inference(
         strategy=strategy,
         logger=False,
         enable_checkpointing=False,
-        enable_progress_bar=True,
-        enable_model_summary=False,
-        callbacks=[results_saver] 
+        callbacks=[results_saver] # Passa o callback para o Trainer
     )
 
     # 4. Executar a inferência
